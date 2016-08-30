@@ -3,4 +3,5 @@ C# tool for unpacking and repacking .qpck files from God Eater Resurrection and 
 
 ## Usage
 Extract: `qpckEater -x <qpck_file>`
+
 Repack: `qpckEater -c <folder>`
