@@ -1,5 +1,7 @@
 ﻿using System;
 using System.IO;
+using System.Linq;
+using System.Globalization;
 
 namespace qpckEater
 {
@@ -7,6 +9,9 @@ namespace qpckEater
     {
         static void Main(string[] args)
         {
+            // Definitions
+            int magic = 0x37402858;
+
             // Variables
             string mode = "";
             string input_str = "";
@@ -30,14 +35,12 @@ namespace qpckEater
                 if (!File.Exists(input_str)) { Console.WriteLine("ERROR: Specified qpck file doesn't exist."); return; }
 
                 // Variables
-                int magic = 0x37402858;
-                int count = 0;
                 long start_offset = 0;
 
                 using (BinaryReader reader = new BinaryReader(File.Open(input_str, FileMode.Open)))
                 {
                     if (reader.ReadInt32() != magic) { Console.WriteLine("ERROR: Invalid header."); return; }
-                    count = reader.ReadInt32();
+                    int count = reader.ReadInt32();
 
                     // Create output directory
                     string folder_path = Path.GetDirectoryName(input_str) + "\\" + Path.GetFileNameWithoutExtension(input_str);
@@ -79,8 +82,54 @@ namespace qpckEater
                 // Check folder
                 if (!Directory.Exists(input_str)) { Console.WriteLine("ERROR: Specified folder doesn't exist."); return; }
 
-                Console.WriteLine("ERROR: Mode currently unsupported.");
-                return;
+                // Get all files from directory (non-recursive)
+                string[] repack_files = Directory.GetFiles(input_str, "*.bin", SearchOption.TopDirectoryOnly).Select(file => Path.GetFileName(file)).ToArray();
+                int count = repack_files.Count();
+                if (count < 1) { Console.WriteLine("ERROR: No valid files found."); return; }
+
+                // Prepare output file
+                string file_path = Path.GetDirectoryName(input_str) + "\\" + Path.GetFileName(input_str) + "_new.qpck";
+                File.WriteAllBytes(file_path, new byte[8 + (count * 20)]);
+                BinaryWriter writer = new BinaryWriter(File.Open(file_path, FileMode.Open));
+                writer.Write(magic);
+                writer.Write(count);
+
+                // Variables
+                long start_offset = 0;
+                long offset = 8 + (count * 20);
+                int progress = 1;
+
+                foreach (string file in repack_files)
+                {
+                    Console.WriteLine("Processing file {0} / {1}: {2}", progress, count, file);
+
+                    // Write file info
+                    string import_path = input_str + "\\" + file;
+                    string hash_str = (file.Substring(9)).Substring(0, file.Length-13);
+                    long hash = long.Parse(hash_str, NumberStyles.HexNumber);
+                    int size = Convert.ToInt32(new FileInfo(import_path).Length);
+
+                    writer.Write(offset);
+                    writer.Write(hash);
+                    writer.Write(size);
+
+                    // Add file data
+                    start_offset = writer.BaseStream.Position;
+
+                    byte[] data = File.ReadAllBytes(import_path);
+                    writer.BaseStream.Seek(offset, SeekOrigin.Begin);
+                    writer.Write(data);
+                    writer.BaseStream.Seek(start_offset, SeekOrigin.Begin);
+
+                    // Calculate offset/progress
+                    offset += size;
+                    progress++;
+                };
+                writer.Close();
+
+                // End
+                Console.WriteLine("=========================");
+                Console.WriteLine("INFO: Finished packing {0} files.", count);
             }
         }
     }
