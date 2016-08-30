@@ -36,6 +36,7 @@ namespace qpckEater
 
                 // Variables
                 long start_offset = 0;
+                int progress = 1;
 
                 using (BinaryReader reader = new BinaryReader(File.Open(input_str, FileMode.Open)))
                 {
@@ -53,11 +54,13 @@ namespace qpckEater
                         long offset = reader.ReadInt64();
                         long hash = reader.ReadInt64();
                         int size = reader.ReadInt32();
-                        Console.WriteLine("#{0}, File {1} @ 0x{2}, Size {3} bytes",
+                        Console.WriteLine("Processing file {0} / {1}: {2} [{3} | {4} bytes]", progress, count, hash.ToString("X16"), offset.ToString("X16"), size);
+
+                        /*Console.WriteLine("#{0}, File {1} @ 0x{2}, Size {3} bytes",
                             (i+1).ToString("D8"),
                             hash.ToString("X16"),
                             offset.ToString("X16"),
-                            size);
+                            size);*/
 
                         start_offset = reader.BaseStream.Position;
 
@@ -68,6 +71,7 @@ namespace qpckEater
                         File.WriteAllBytes(folder_path + "\\" + file_name, file_bytes);
 
                         reader.BaseStream.Seek(start_offset, SeekOrigin.Begin);
+                        progress++;
                     }
 
                     // End
@@ -101,13 +105,13 @@ namespace qpckEater
 
                 foreach (string file in repack_files)
                 {
-                    Console.WriteLine("Processing file {0} / {1}: {2}", progress, count, file);
-
                     // Write file info
                     string import_path = input_str + "\\" + file;
                     string hash_str = (file.Substring(9)).Substring(0, file.Length-13);
                     long hash = long.Parse(hash_str, NumberStyles.HexNumber);
                     int size = Convert.ToInt32(new FileInfo(import_path).Length);
+
+                    Console.WriteLine("Processing file {0} / {1}: {2} [{3} | {4} bytes]", progress, count, hash_str, offset.ToString("X16"), size);
 
                     writer.Write(offset);
                     writer.Write(hash);
