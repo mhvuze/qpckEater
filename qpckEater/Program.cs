@@ -16,7 +16,7 @@ namespace qpckEater
             Console.WriteLine("=========================");
 
             // Handle arguments
-            if (args.Length < 2) { Console.WriteLine("ERROR: Not enough arguments specified.\nExtract: qpck -x <qpck>"); return; }
+            if (args.Length < 2) { Console.WriteLine("ERROR: Not enough arguments specified.\nExtract: qpckEater -x <qpck>\nCreate: qpckEater -c <folder>"); return; }
             mode = args[0];
             input_str = args[1];
 
