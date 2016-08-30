@@ -2,6 +2,7 @@
 using System.IO;
 using System.Linq;
 using System.Globalization;
+using System.Collections.Generic;
 
 namespace qpckEater
 {
@@ -56,18 +57,14 @@ namespace qpckEater
                         int size = reader.ReadInt32();
                         Console.WriteLine("Processing file {0} / {1}: {2} [{3} | {4} bytes]", progress, count, hash.ToString("X16"), offset.ToString("X16"), size);
 
-                        /*Console.WriteLine("#{0}, File {1} @ 0x{2}, Size {3} bytes",
-                            (i+1).ToString("D8"),
-                            hash.ToString("X16"),
-                            offset.ToString("X16"),
-                            size);*/
-
                         start_offset = reader.BaseStream.Position;
 
                         // Extract file
                         reader.BaseStream.Seek(offset, SeekOrigin.Begin);
+                        int type_magic = reader.ReadInt32();
+                        reader.BaseStream.Seek(-4, SeekOrigin.Current);
                         byte[] file_bytes = reader.ReadBytes(size);
-                        string file_name = (i + 1).ToString("D8") + "_" + hash.ToString("X16") + ".bin";
+                        string file_name = (i + 1).ToString("D8") + "_" + hash.ToString("X16") + GetExtension(type_magic);
                         File.WriteAllBytes(folder_path + "\\" + file_name, file_bytes);
 
                         reader.BaseStream.Seek(start_offset, SeekOrigin.Begin);
@@ -87,7 +84,7 @@ namespace qpckEater
                 if (!Directory.Exists(input_str)) { Console.WriteLine("ERROR: Specified folder doesn't exist."); return; }
 
                 // Get all files from directory (non-recursive)
-                string[] repack_files = Directory.GetFiles(input_str, "*.bin", SearchOption.TopDirectoryOnly).Select(file => Path.GetFileName(file)).ToArray();
+                string[] repack_files = Directory.GetFiles(input_str, "*.*", SearchOption.TopDirectoryOnly).Select(file => Path.GetFileName(file)).ToArray();
                 int count = repack_files.Count();
                 if (count < 1) { Console.WriteLine("ERROR: No valid files found."); return; }
 
@@ -135,6 +132,25 @@ namespace qpckEater
                 Console.WriteLine("=========================");
                 Console.WriteLine("INFO: Finished packing {0} files.", count);
             }
+        }
+
+        // Better extensions
+        static string GetExtension(int magic)
+        {
+            Dictionary<int, string> extension_dic = new Dictionary<int, string>
+            {
+                { 0x46534e42, ".bnsf" },
+                { 0x6c566d47, ".gmvl" },
+                { 0x3272742e, ".tr2" },
+                { 0x73657250, ".pres" },
+                { 0x347a6c62, ".blz4" },
+            };
+
+            string extension_str;
+            if (extension_dic.TryGetValue(magic, out extension_str)) { }
+            else { extension_str = ".bin";  }
+
+            return extension_str;
         }
     }
 }
