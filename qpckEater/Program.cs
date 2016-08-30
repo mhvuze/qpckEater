@@ -104,7 +104,7 @@ namespace qpckEater
                 {
                     // Write file info
                     string import_path = input_str + "\\" + file;
-                    string hash_str = (file.Substring(9)).Substring(0, file.Length-13);
+                    string hash_str = Path.GetFileNameWithoutExtension(file).Substring(9);
                     long hash = long.Parse(hash_str, NumberStyles.HexNumber);
                     int size = Convert.ToInt32(new FileInfo(import_path).Length);
 
