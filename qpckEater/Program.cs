@@ -82,14 +82,42 @@ namespace qpckEater
                             // .blz4 unpacking
                             if (type_magic == 0x347a6c62)
                             {
-                                using (BinaryReader blz4_reader = new BinaryReader(File.Open(folder_path + "\\" + file_name, FileMode.Open)))
+                                string file = folder_path + "\\" + file_name;                                
+                                int chunk = 0;
+                                int u_size = 0;
+                                int c_size = 0;
+                                byte[] unknown = new byte[0x10];
+
+                                using (BinaryReader blz_reader = new BinaryReader(File.Open(file, FileMode.Open)))
                                 {
-                                    // Note: .blz4 are zlib compressed
-                                    blz4_reader.BaseStream.Seek(4, SeekOrigin.Begin);
-                                    int size_c = Convert.ToInt32(new FileInfo(folder_path + "\\" + file_name).Length) - 0x10;
-                                    int size_u = blz4_reader.ReadInt32();
-                                    byte[] data = blz4_reader.ReadBytes(size_c);
+                                    // Get file info
+                                    blz_reader.BaseStream.Seek(4, SeekOrigin.Begin);
+                                    u_size = blz_reader.ReadInt32();
+                                    blz_reader.BaseStream.Seek(8, SeekOrigin.Current);
+                                    unknown = blz_reader.ReadBytes(0x10);
+
+                                    byte[] out_file = new byte[u_size];
+                                    while (blz_reader.BaseStream.Position < size)
+                                    {
+                                        // Get compressed chunk
+                                        c_size = blz_reader.ReadUInt16();
+                                        byte[] data = new byte[c_size];
+                                        data = blz_reader.ReadBytes(c_size);
+
+                                        // Uncompress data
+                                        string file_name_blz = (i + 1).ToString("D8") + "_" + hash.ToString("X16") + "_unp" + (chunk + 1).ToString("D2") + GetExtension(type_magic);
+
+                                        MemoryStream stream = new MemoryStream(data);
+                                        using (Stream extract = File.OpenWrite(folder_path + "\\" + file_name_blz))
+                                        {
+                                            Helper.DecompressData(data, out out_file);
+                                            extract.Write(out_file, 0, out_file.Length);
+                                        }
+                                        chunk++;
+                                    }
                                 }
+                                // End
+                                Console.WriteLine("INFO: Detected and unpacked .blz4 file. {0} chunk(s).", chunk);
                             }
                         }
 
