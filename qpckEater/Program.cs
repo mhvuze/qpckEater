@@ -22,15 +22,15 @@ namespace qpckEater
             Console.WriteLine("=========================");
 
             // Handle arguments
-            if (args.Length < 2) { Console.WriteLine("ERROR: Not enough arguments specified.\nExtract: qpckEater -x/-xd <qpck>\nCreate: qpckEater -c <folder>"); return; }
+            if (args.Length < 2) { Console.WriteLine("ERROR: Not enough arguments specified.\n\nExtract: qpckEater -x/ <qpck>\nExtract and unpack: qpckEater -xp <qpck>\n\nCreate: qpckEater -c <folder>\nCreate and repack: qpckEater -cp <folder>"); return; }
             mode = args[0];
             input_str = args[1];
 
             // Check mode
-            if (mode != "-x" && mode != "-xd" && mode != "-c") { Console.WriteLine("ERROR: Unsupported mode specified."); return; }
+            if (mode != "-x" && mode != "-xp" && mode != "-c" && mode != "-cp") { Console.WriteLine("ERROR: Unsupported mode specified."); return; }
 
             // Unpacking
-            if (mode == "-x" || mode == "-xd")
+            if (mode == "-x" || mode == "-xp")
             {
                 // Check file
                 if (!File.Exists(input_str)) { Console.WriteLine("ERROR: Specified qpck file doesn't exist."); return; }
@@ -68,7 +68,7 @@ namespace qpckEater
                         File.WriteAllBytes(folder_path + "\\" + file_name, file_bytes);
 
                         // Unpack extracted archives if intended
-                        if (mode == "-xd")
+                        if (mode == "-xp")
                         {
                             // .pres unpacking
                             if (type_magic == 0x73657250)
@@ -84,7 +84,11 @@ namespace qpckEater
                             {
                                 using (BinaryReader blz4_reader = new BinaryReader(File.Open(folder_path + "\\" + file_name, FileMode.Open)))
                                 {
-                                    // stuff
+                                    // Note: .blz4 are zlib compressed
+                                    blz4_reader.BaseStream.Seek(4, SeekOrigin.Begin);
+                                    int size_c = Convert.ToInt32(new FileInfo(folder_path + "\\" + file_name).Length) - 0x10;
+                                    int size_u = blz4_reader.ReadInt32();
+                                    byte[] data = blz4_reader.ReadBytes(size_c);
                                 }
                             }
                         }
@@ -100,7 +104,7 @@ namespace qpckEater
             }
 
             // Repacking
-            if (mode == "-c")
+            if (mode == "-c" || mode == "-cp")
             {
                 // Check folder
                 if (!Directory.Exists(input_str)) { Console.WriteLine("ERROR: Specified folder doesn't exist."); return; }
