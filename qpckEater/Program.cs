@@ -22,15 +22,15 @@ namespace qpckEater
             Console.WriteLine("=========================");
 
             // Handle arguments
-            if (args.Length < 2) { Console.WriteLine("ERROR: Not enough arguments specified.\nExtract: qpckEater -x <qpck>\nCreate: qpckEater -c <folder>"); return; }
+            if (args.Length < 2) { Console.WriteLine("ERROR: Not enough arguments specified.\nExtract: qpckEater -x/-xd <qpck>\nCreate: qpckEater -c <folder>"); return; }
             mode = args[0];
             input_str = args[1];
 
             // Check mode
-            if (mode != "-x" && mode != "-c") { Console.WriteLine("ERROR: Unsupported mode specified."); return; }
+            if (mode != "-x" && mode != "-xd" && mode != "-c") { Console.WriteLine("ERROR: Unsupported mode specified."); return; }
 
             // Unpacking
-            if (mode == "-x")
+            if (mode == "-x" || mode == "-xd")
             {
                 // Check file
                 if (!File.Exists(input_str)) { Console.WriteLine("ERROR: Specified qpck file doesn't exist."); return; }
@@ -45,7 +45,7 @@ namespace qpckEater
                     int count = reader.ReadInt32();
 
                     // Create output directory
-                    string folder_path = Path.GetDirectoryName(input_str) + "\\" + Path.GetFileNameWithoutExtension(input_str);
+                    string folder_path = new FileInfo(input_str).Directory.FullName + "\\" + Path.GetFileNameWithoutExtension(input_str);
                     if (!Directory.Exists(folder_path)) { Directory.CreateDirectory(folder_path); }
 
                     Console.WriteLine("File index:");
@@ -66,6 +66,28 @@ namespace qpckEater
                         byte[] file_bytes = reader.ReadBytes(size);
                         string file_name = (i + 1).ToString("D8") + "_" + hash.ToString("X16") + GetExtension(type_magic);
                         File.WriteAllBytes(folder_path + "\\" + file_name, file_bytes);
+
+                        // Unpack extracted archives if intended
+                        if (mode == "-xd")
+                        {
+                            // .pres unpacking
+                            if (type_magic == 0x73657250)
+                            {
+                                using (BinaryReader pres_reader = new BinaryReader(File.Open(folder_path + "\\" + file_name, FileMode.Open)))
+                                {
+                                    // stuff
+                                }
+                            }
+
+                            // .blz4 unpacking
+                            if (type_magic == 0x347a6c62)
+                            {
+                                using (BinaryReader blz4_reader = new BinaryReader(File.Open(folder_path + "\\" + file_name, FileMode.Open)))
+                                {
+                                    // stuff
+                                }
+                            }
+                        }
 
                         reader.BaseStream.Seek(start_offset, SeekOrigin.Begin);
                         progress++;
@@ -89,7 +111,7 @@ namespace qpckEater
                 if (count < 1) { Console.WriteLine("ERROR: No valid files found."); return; }
 
                 // Prepare output file
-                string file_path = Path.GetDirectoryName(input_str) + "\\" + Path.GetFileName(input_str) + "_new.qpck";
+                string file_path = new FileInfo(input_str).Directory.FullName + "\\" + Path.GetFileName(input_str) + "_new.qpck";
                 File.WriteAllBytes(file_path, new byte[8 + (count * 20)]);
                 BinaryWriter writer = new BinaryWriter(File.Open(file_path, FileMode.Open));
                 writer.Write(magic);
