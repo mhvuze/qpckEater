@@ -75,14 +75,17 @@ namespace qpckEater
                             {
                                 using (BinaryReader pres_reader = new BinaryReader(File.Open(folder_path + "\\" + file_name, FileMode.Open)))
                                 {
-                                    // stuff
+                                    // pres
                                 }
                             }
 
                             // .blz4 unpacking
                             if (type_magic == 0x347a6c62)
                             {
-                                string file = folder_path + "\\" + file_name;                                
+                                string file = folder_path + "\\" + file_name;
+                                string folder_path_blz = folder_path + "\\" + (i + 1).ToString("D8") + "_" + hash.ToString("X16");
+                                if (!Directory.Exists(folder_path_blz)) { Directory.CreateDirectory(folder_path_blz); }
+
                                 int chunk = 0;
                                 int u_size = 0;
                                 int c_size = 0;
@@ -108,7 +111,7 @@ namespace qpckEater
                                         string file_name_blz = (i + 1).ToString("D8") + "_" + hash.ToString("X16") + "_unp" + (chunk + 1).ToString("D2") + GetExtension(type_magic);
 
                                         MemoryStream stream = new MemoryStream(data);
-                                        using (Stream extract = File.OpenWrite(folder_path + "\\" + file_name_blz))
+                                        using (Stream extract = File.OpenWrite(folder_path_blz + "\\" + file_name_blz))
                                         {
                                             Helper.DecompressData(data, out out_file);
                                             extract.Write(out_file, 0, out_file.Length);
@@ -117,6 +120,7 @@ namespace qpckEater
                                     }
                                 }
                                 // End
+                                using (Stream unknown_stream = File.Create(folder_path_blz + "\\id.txt")) { unknown_stream.Write(unknown, 0, 0x10); }
                                 Console.WriteLine("INFO: Detected and unpacked .blz4 file. {0} chunk(s).", chunk);
                             }
                         }
