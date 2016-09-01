@@ -75,8 +75,11 @@ namespace qpckEater
                             {
                                 using (BinaryReader pres_reader = new BinaryReader(File.Open(folder_path + "\\" + file_name, FileMode.Open)))
                                 {
-                                    // pres
+                                    pres_reader.BaseStream.Seek(4, SeekOrigin.Begin);
                                 }
+
+                                // Remove later
+                                Console.WriteLine("ERROR: pres processing currently not supported.");
                             }
 
                             // .blz4 unpacking
@@ -87,19 +90,15 @@ namespace qpckEater
                                 if (!Directory.Exists(folder_path_blz)) { Directory.CreateDirectory(folder_path_blz); }
 
                                 int chunk = 0;
-                                int u_size = 0;
                                 int c_size = 0;
                                 byte[] unknown = new byte[0x10];
 
                                 using (BinaryReader blz_reader = new BinaryReader(File.Open(file, FileMode.Open)))
                                 {
                                     // Get file info
-                                    blz_reader.BaseStream.Seek(4, SeekOrigin.Begin);
-                                    u_size = blz_reader.ReadInt32();
-                                    blz_reader.BaseStream.Seek(8, SeekOrigin.Current);
+                                    blz_reader.BaseStream.Seek(0x10, SeekOrigin.Current);
                                     unknown = blz_reader.ReadBytes(0x10);
 
-                                    byte[] out_file = new byte[u_size];
                                     while (blz_reader.BaseStream.Position < size)
                                     {
                                         // Get compressed chunk
@@ -108,11 +107,12 @@ namespace qpckEater
                                         data = blz_reader.ReadBytes(c_size);
 
                                         // Uncompress data
-                                        string file_name_blz = (i + 1).ToString("D8") + "_" + hash.ToString("X16") + "_unp" + (chunk + 1).ToString("D2") + GetExtension(type_magic);
+                                        string file_name_blz = (i + 1).ToString("D8") + "_" + hash.ToString("X16") + "_" + (chunk + 1).ToString("D2") + GetExtension(type_magic);
 
                                         MemoryStream stream = new MemoryStream(data);
                                         using (Stream extract = File.OpenWrite(folder_path_blz + "\\" + file_name_blz))
                                         {
+                                            byte[] out_file;
                                             Helper.DecompressData(data, out out_file);
                                             extract.Write(out_file, 0, out_file.Length);
                                         }
