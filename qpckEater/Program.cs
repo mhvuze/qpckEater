@@ -22,12 +22,12 @@ namespace qpckEater
             Console.WriteLine("=========================");
 
             // Handle arguments
-            if (args.Length < 2) { Console.WriteLine("ERROR: Not enough arguments specified.\n\nExtract: qpckEater -x/ <qpck>\nExtract and unpack: qpckEater -xp <qpck>\n\nCreate: qpckEater -c <folder>\nCreate and repack: qpckEater -cp <folder>"); return; }
+            if (args.Length < 2) { Console.WriteLine("ERROR: Not enough arguments specified.\n\nExtract: qpckEater -x <qpck>\nExtract and unpack: qpckEater -xp <qpck>\n\nCreate qpck: qpckEater -c <folder>\nRepack .blz4/.pres: qpckEater -r <folder>"); return; }
             mode = args[0];
             input_str = args[1];
 
             // Check mode
-            if (mode != "-x" && mode != "-xp" && mode != "-c" && mode != "-cp") { Console.WriteLine("ERROR: Unsupported mode specified."); return; }
+            if (mode != "-x" && mode != "-xp" && mode != "-c" && mode != "-r") { Console.WriteLine("ERROR: Unsupported mode specified."); return; }
 
             // Unpacking
             if (mode == "-x" || mode == "-xp")
@@ -135,8 +135,8 @@ namespace qpckEater
                 }
             }
 
-            // Repacking
-            if (mode == "-c" || mode == "-cp")
+            // Create qpck
+            if (mode == "-c")
             {
                 // Check folder
                 if (!Directory.Exists(input_str)) { Console.WriteLine("ERROR: Specified folder doesn't exist."); return; }
@@ -189,6 +189,16 @@ namespace qpckEater
                 // End
                 Console.WriteLine("=========================");
                 Console.WriteLine("INFO: Finished packing {0} files.", count);
+            }
+
+            // Repack blz4/pres
+            if (mode == "-r")
+            {
+                // Check folder
+                if (!Directory.Exists(input_str)) { Console.WriteLine("ERROR: Specified folder doesn't exist."); return; }
+
+                Console.WriteLine("INFO: Repacking .blz4/.pres is currently not supported.");
+                return;
             }
         }
 
