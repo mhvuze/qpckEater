@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Globalization;
 using System.Collections.Generic;
+using System.Text;
 
 namespace qpckEater
 {
@@ -70,22 +71,107 @@ namespace qpckEater
                         // Unpack extracted archives if intended
                         if (mode == "-xp")
                         {
+                            string file = folder_path + "\\" + file_name;
+
                             // .pres unpacking
                             if (type_magic == 0x73657250)
                             {
-                                using (BinaryReader pres_reader = new BinaryReader(File.Open(folder_path + "\\" + file_name, FileMode.Open)))
-                                {
-                                    pres_reader.BaseStream.Seek(4, SeekOrigin.Begin);
-                                }
+                                long reader_index_root = 0;
+                                long reader_index_set = 0;
+                                long reader_index_file = 0;
 
-                                // Remove later
-                                Console.WriteLine("ERROR: pres processing currently not supported.");
+                                using (BinaryReader pres_reader = new BinaryReader(File.Open(file, FileMode.Open)))
+                                {
+                                    // Get general pres info
+                                    pres_reader.BaseStream.Seek(4, SeekOrigin.Begin);
+                                    int unk1 = pres_reader.ReadInt32();
+                                    int unk2 = pres_reader.ReadInt32();
+                                    int unk3 = pres_reader.ReadInt32();
+                                    int offset_data = pres_reader.ReadInt32();
+                                    int unk4 = pres_reader.ReadInt32();
+                                    int unk5 = pres_reader.ReadInt32();
+                                    int count_set = pres_reader.ReadInt32();
+
+                                    reader_index_root = pres_reader.BaseStream.Position;
+
+                                    for (int j = 0; j < count_set; j++)
+                                    {
+                                        if (count_set > 1)
+                                        {
+                                            int set_offset = pres_reader.ReadInt32();
+                                            int unk6 = pres_reader.ReadInt32();
+                                            pres_reader.BaseStream.Seek(set_offset, SeekOrigin.Begin);
+                                        }
+
+                                        // Read set info
+                                        int names_off = pres_reader.ReadInt32();
+                                        int names_elements = pres_reader.ReadInt32();
+                                        int set_unk1 = pres_reader.ReadInt32();
+                                        int set_unk2 = pres_reader.ReadInt32();
+                                        int info_off = pres_reader.ReadInt32();
+                                        int count_file = pres_reader.ReadInt32();
+                                        int set_unk3 = pres_reader.ReadInt32();
+                                        int set_unk4 = pres_reader.ReadInt32();
+                                        int set_unk5 = pres_reader.ReadInt32();
+                                        int set_unk6 = pres_reader.ReadInt32();
+                                        int set_unk7 = pres_reader.ReadInt32();
+                                        int set_unk8 = pres_reader.ReadInt32();
+
+                                        reader_index_set = pres_reader.BaseStream.Position;
+
+                                        for (int k = 0; k < count_file; k++)
+                                        {
+                                            // Get individual file info
+                                            pres_reader.BaseStream.Seek(info_off, SeekOrigin.Begin);
+                                            int offset_file = pres_reader.ReadInt32();
+                                            int csize_file = pres_reader.ReadInt32();
+                                            int name_off_file = pres_reader.ReadInt32();
+                                            int name_elements_file = pres_reader.ReadInt32();
+                                            int file_unk1 = pres_reader.ReadInt32();
+                                            int file_unk2 = pres_reader.ReadInt32();
+                                            int file_unk3 = pres_reader.ReadInt32();
+                                            int usize_file = pres_reader.ReadInt32();
+
+                                            reader_index_file = pres_reader.BaseStream.Position;
+
+                                            // Get individual file name info
+                                            pres_reader.BaseStream.Seek(name_off_file, SeekOrigin.Begin);
+                                            int name_off_final = pres_reader.ReadInt32();
+                                            int ext_off_final = pres_reader.ReadInt32();
+                                            int folder_off_final = pres_reader.ReadInt32();
+                                            int complete_off_final = pres_reader.ReadInt32();
+
+                                            // Get individual file path
+                                            string str_name_final = "";
+                                            string str_ext_final = "";
+                                            string str_folder_final = "";
+                                            string str_complete_final = "";
+                                            if (name_elements_file >= 1) { pres_reader.BaseStream.Seek(name_off_final, SeekOrigin.Begin); str_name_final = readNullterminated(pres_reader); }
+                                            if (name_elements_file >= 2) { pres_reader.BaseStream.Seek(ext_off_final, SeekOrigin.Begin); str_ext_final = readNullterminated(pres_reader); }
+                                            if (name_elements_file >= 3) { pres_reader.BaseStream.Seek(folder_off_final, SeekOrigin.Begin); str_folder_final = readNullterminated(pres_reader); }
+                                            if (name_elements_file >= 4) { pres_reader.BaseStream.Seek(complete_off_final, SeekOrigin.Begin); str_complete_final = readNullterminated(pres_reader); }
+
+                                            // Finally extract individual file...
+                                            string file_folder = str_complete_final.Substring(0, str_complete_final.LastIndexOf("/") + 1);
+                                            string folder_path_pres = folder_path + "\\" + (i + 1).ToString("D8") + "_" + hash.ToString("X16") + "\\" + file_folder;
+                                            if (!Directory.Exists(folder_path_pres)) { Directory.CreateDirectory(folder_path_pres); }
+
+                                            int shifted_offset = offset_file & ((1 << (32 - 4)) - 1);
+                                            pres_reader.BaseStream.Seek(shifted_offset, SeekOrigin.Begin);
+                                            byte[] data = pres_reader.ReadBytes(csize_file);
+                                            File.WriteAllBytes(folder_path_pres + "\\" + str_name_final + "." + str_ext_final, data);
+
+                                            // End loop
+                                            pres_reader.BaseStream.Seek(reader_index_file + (k * 0x20), SeekOrigin.Begin);
+                                        }
+                                        if (count_set > 1) { pres_reader.BaseStream.Seek(reader_index_root + ((j + 1) * 8), SeekOrigin.Begin); }                                            
+                                    }
+                                }
                             }
 
                             // .blz4 unpacking
                             if (type_magic == 0x347a6c62)
-                            {
-                                string file = folder_path + "\\" + file_name;
+                            {                                
                                 string folder_path_blz = folder_path + "\\" + (i + 1).ToString("D8") + "_" + hash.ToString("X16");
                                 if (!Directory.Exists(folder_path_blz)) { Directory.CreateDirectory(folder_path_blz); }
 
@@ -215,10 +301,31 @@ namespace qpckEater
             };
 
             string extension_str;
-            if (extension_dic.TryGetValue(magic, out extension_str)) { }
-            else { extension_str = ".bin";  }
+            if (!extension_dic.TryGetValue(magic, out extension_str)) { extension_str = ".bin"; }
 
             return extension_str;
+        }
+
+        // Read null-terminated string
+        static string readNullterminated(BinaryReader reader)
+        {
+            var char_array = new List<byte>();
+            string str = "";
+            if (reader.BaseStream.Position == reader.BaseStream.Length)
+            {
+                byte[] char_bytes2 = char_array.ToArray();
+                str = Encoding.UTF8.GetString(char_bytes2);
+                return str;
+            }
+            byte b = reader.ReadByte();
+            while ((b != 0x00) && (reader.BaseStream.Position != reader.BaseStream.Length))
+            {
+                char_array.Add(b);
+                b = reader.ReadByte();
+            }
+            byte[] char_bytes = char_array.ToArray();
+            str = Encoding.UTF8.GetString(char_bytes);
+            return str;
         }
     }
 }
