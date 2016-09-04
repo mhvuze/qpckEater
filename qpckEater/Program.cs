@@ -66,7 +66,7 @@ namespace qpckEater
                         reader.BaseStream.Seek(-4, SeekOrigin.Current);
                         byte[] file_bytes = reader.ReadBytes(size);
                         string file_name = (i + 1).ToString("D8") + "_" + hash.ToString("X16") + GetExtension(type_magic);
-                        File.WriteAllBytes(folder_path + "\\" + file_name, file_bytes);
+                        //File.WriteAllBytes(folder_path + "\\" + file_name, file_bytes);
 
                         // Unpack extracted archives if intended
                         if (mode == "-xp")
@@ -80,7 +80,9 @@ namespace qpckEater
                                 long reader_index_set = 0;
                                 long reader_index_file = 0;
 
-                                using (BinaryReader pres_reader = new BinaryReader(File.Open(file, FileMode.Open)))
+                                //using (BinaryReader pres_reader = new BinaryReader(File.Open(file, FileMode.Open)))
+                                Stream stream = new MemoryStream(file_bytes);
+                                using (BinaryReader pres_reader = new BinaryReader(stream))
                                 {
                                     // Get general pres info
                                     pres_reader.BaseStream.Seek(4, SeekOrigin.Begin);
@@ -152,19 +154,23 @@ namespace qpckEater
                                             if (name_elements_file >= 4) { pres_reader.BaseStream.Seek(complete_off_final, SeekOrigin.Begin); str_complete_final = readNullterminated(pres_reader); }
 
                                             // Finally extract individual file...
-                                            string file_folder = str_complete_final.Substring(0, str_complete_final.LastIndexOf("/") + 1);
+                                            /*string file_folder = str_complete_final.Substring(0, str_complete_final.LastIndexOf("/") + 1);
                                             string folder_path_pres = folder_path + "\\" + (i + 1).ToString("D8") + "_" + hash.ToString("X16") + "\\" + file_folder;
                                             if (!Directory.Exists(folder_path_pres)) { Directory.CreateDirectory(folder_path_pres); }
 
                                             int shifted_offset = offset_file & ((1 << (32 - 4)) - 1);
                                             pres_reader.BaseStream.Seek(shifted_offset, SeekOrigin.Begin);
                                             byte[] data = pres_reader.ReadBytes(csize_file);
-                                            File.WriteAllBytes(folder_path_pres + "\\" + str_name_final + "." + str_ext_final, data);
+                                            File.WriteAllBytes(folder_path_pres + "\\" + str_name_final + "." + str_ext_final, data);*/
+
+                                            // Print path to file
+                                            using (StreamWriter pres_list = new StreamWriter(folder_path + "\\pres_list.txt", true))
+                                                pres_list.WriteLine(str_complete_final);
 
                                             // End loop
                                             pres_reader.BaseStream.Seek(reader_index_file + (k * 0x20), SeekOrigin.Begin);
                                         }
-                                        if (count_set > 1) { pres_reader.BaseStream.Seek(reader_index_root + ((j + 1) * 8), SeekOrigin.Begin); }                                            
+                                        if (count_set > 1) { pres_reader.BaseStream.Seek(reader_index_root + ((j + 1) * 8), SeekOrigin.Begin); }
                                     }
                                 }
                             }
@@ -172,7 +178,7 @@ namespace qpckEater
                             // .blz4 unpacking
                             if (type_magic == 0x347a6c62)
                             {                                
-                                string folder_path_blz = folder_path + "\\" + (i + 1).ToString("D8") + "_" + hash.ToString("X16");
+                                /*string folder_path_blz = folder_path + "\\" + (i + 1).ToString("D8") + "_" + hash.ToString("X16");
                                 if (!Directory.Exists(folder_path_blz)) { Directory.CreateDirectory(folder_path_blz); }
 
                                 int chunk = 0;
@@ -208,6 +214,7 @@ namespace qpckEater
                                 // End
                                 using (Stream unknown_stream = File.Create(folder_path_blz + "\\id.txt")) { unknown_stream.Write(unknown, 0, 0x10); }
                                 Console.WriteLine("INFO: Detected and unpacked .blz4 file. {0} chunk(s).", chunk);
+                                */
                             }
                         }
 
@@ -218,6 +225,10 @@ namespace qpckEater
                     // End
                     Console.WriteLine("=========================");
                     Console.WriteLine("INFO: Finished extracting {0} files.", count);
+
+                    // REMLATER: Clean up dupes in list
+                    var previous = new HashSet<string>();
+                    File.WriteAllLines(folder_path + "\\pres_list_clean.txt", File.ReadLines(folder_path + "\\pres_list.txt").Where(line => previous.Add(line)));
                 }
             }
 
