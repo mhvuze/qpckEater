@@ -65,19 +65,14 @@ namespace qpckEater
                         int type_magic = reader.ReadInt32();
                         reader.BaseStream.Seek(-4, SeekOrigin.Current);
                         byte[] file_bytes = reader.ReadBytes(size);
-                        string file_name = (i + 1).ToString("D8") + "_" + hash.ToString("X16") + GetExtension(type_magic);
-                        //File.WriteAllBytes(folder_path + "\\" + file_name, file_bytes);
 
                         // Unpack extracted archives if intended
                         if (mode == "-xp")
                         {
-                            string file = folder_path + "\\" + file_name;
-
                             // .pres unpacking
                             if (type_magic == 0x73657250)
                             {
                                 long reader_index_root = 0;
-                                long reader_index_set = 0;
                                 long reader_index_file = 0;
 
                                 //using (BinaryReader pres_reader = new BinaryReader(File.Open(file, FileMode.Open)))
@@ -85,13 +80,7 @@ namespace qpckEater
                                 using (BinaryReader pres_reader = new BinaryReader(stream))
                                 {
                                     // Get general pres info
-                                    pres_reader.BaseStream.Seek(4, SeekOrigin.Begin);
-                                    int unk1 = pres_reader.ReadInt32();
-                                    int unk2 = pres_reader.ReadInt32();
-                                    int unk3 = pres_reader.ReadInt32();
-                                    int offset_data = pres_reader.ReadInt32();
-                                    int unk4 = pres_reader.ReadInt32();
-                                    int unk5 = pres_reader.ReadInt32();
+                                    pres_reader.BaseStream.Seek(28, SeekOrigin.Begin);
                                     int count_set = pres_reader.ReadInt32();
 
                                     reader_index_root = pres_reader.BaseStream.Position;
@@ -106,33 +95,17 @@ namespace qpckEater
                                         }
 
                                         // Read set info
-                                        int names_off = pres_reader.ReadInt32();
-                                        int names_elements = pres_reader.ReadInt32();
-                                        int set_unk1 = pres_reader.ReadInt32();
-                                        int set_unk2 = pres_reader.ReadInt32();
+                                        pres_reader.BaseStream.Seek(16, SeekOrigin.Current);
                                         int info_off = pres_reader.ReadInt32();
-                                        int count_file = pres_reader.ReadInt32();
-                                        int set_unk3 = pres_reader.ReadInt32();
-                                        int set_unk4 = pres_reader.ReadInt32();
-                                        int set_unk5 = pres_reader.ReadInt32();
-                                        int set_unk6 = pres_reader.ReadInt32();
-                                        int set_unk7 = pres_reader.ReadInt32();
-                                        int set_unk8 = pres_reader.ReadInt32();
-
-                                        reader_index_set = pres_reader.BaseStream.Position;
+                                        int count_file = pres_reader.ReadInt32();                                     
 
                                         for (int k = 0; k < count_file; k++)
                                         {
                                             // Get individual file info
-                                            pres_reader.BaseStream.Seek(info_off, SeekOrigin.Begin);
-                                            int offset_file = pres_reader.ReadInt32();
-                                            int csize_file = pres_reader.ReadInt32();
+                                            pres_reader.BaseStream.Seek(info_off + 8, SeekOrigin.Begin);
                                             int name_off_file = pres_reader.ReadInt32();
                                             int name_elements_file = pres_reader.ReadInt32();
-                                            int file_unk1 = pres_reader.ReadInt32();
-                                            int file_unk2 = pres_reader.ReadInt32();
-                                            int file_unk3 = pres_reader.ReadInt32();
-                                            int usize_file = pres_reader.ReadInt32();
+                                            pres_reader.BaseStream.Seek(16, SeekOrigin.Current);
 
                                             reader_index_file = pres_reader.BaseStream.Position;
 
@@ -153,19 +126,17 @@ namespace qpckEater
                                             if (name_elements_file >= 3) { pres_reader.BaseStream.Seek(folder_off_final, SeekOrigin.Begin); str_folder_final = readNullterminated(pres_reader); }
                                             if (name_elements_file >= 4) { pres_reader.BaseStream.Seek(complete_off_final, SeekOrigin.Begin); str_complete_final = readNullterminated(pres_reader); }
 
-                                            // Finally extract individual file...
-                                            /*string file_folder = str_complete_final.Substring(0, str_complete_final.LastIndexOf("/") + 1);
-                                            string folder_path_pres = folder_path + "\\" + (i + 1).ToString("D8") + "_" + hash.ToString("X16") + "\\" + file_folder;
-                                            if (!Directory.Exists(folder_path_pres)) { Directory.CreateDirectory(folder_path_pres); }
-
-                                            int shifted_offset = offset_file & ((1 << (32 - 4)) - 1);
-                                            pres_reader.BaseStream.Seek(shifted_offset, SeekOrigin.Begin);
-                                            byte[] data = pres_reader.ReadBytes(csize_file);
-                                            File.WriteAllBytes(folder_path_pres + "\\" + str_name_final + "." + str_ext_final, data);*/
-
                                             // Print path to file
+                                            if (File.Exists(folder_path + "\\pres_list.txt")) { File.Delete(folder_path + "\\pres_list.txt"); }
                                             using (StreamWriter pres_list = new StreamWriter(folder_path + "\\pres_list.txt", true))
-                                                pres_list.WriteLine(str_complete_final);
+                                            {
+                                                if (str_complete_final == "")
+                                                {
+                                                    // skip
+                                                }
+                                                else { pres_list.WriteLine(str_complete_final); }                                                
+                                            }
+                                                
 
                                             // End loop
                                             pres_reader.BaseStream.Seek(reader_index_file + (k * 0x20), SeekOrigin.Begin);
@@ -173,48 +144,6 @@ namespace qpckEater
                                         if (count_set > 1) { pres_reader.BaseStream.Seek(reader_index_root + ((j + 1) * 8), SeekOrigin.Begin); }
                                     }
                                 }
-                            }
-
-                            // .blz4 unpacking
-                            if (type_magic == 0x347a6c62)
-                            {                                
-                                /*string folder_path_blz = folder_path + "\\" + (i + 1).ToString("D8") + "_" + hash.ToString("X16");
-                                if (!Directory.Exists(folder_path_blz)) { Directory.CreateDirectory(folder_path_blz); }
-
-                                int chunk = 0;
-                                int c_size = 0;
-                                byte[] unknown = new byte[0x10];
-
-                                using (BinaryReader blz_reader = new BinaryReader(File.Open(file, FileMode.Open)))
-                                {
-                                    // Get file info
-                                    blz_reader.BaseStream.Seek(0x10, SeekOrigin.Current);
-                                    unknown = blz_reader.ReadBytes(0x10);
-
-                                    while (blz_reader.BaseStream.Position < size)
-                                    {
-                                        // Get compressed chunk
-                                        c_size = blz_reader.ReadUInt16();
-                                        byte[] data = new byte[c_size];
-                                        data = blz_reader.ReadBytes(c_size);
-
-                                        // Uncompress data
-                                        string file_name_blz = (i + 1).ToString("D8") + "_" + hash.ToString("X16") + "_" + (chunk + 1).ToString("D2") + GetExtension(type_magic);
-
-                                        MemoryStream stream = new MemoryStream(data);
-                                        using (Stream extract = File.OpenWrite(folder_path_blz + "\\" + file_name_blz))
-                                        {
-                                            byte[] out_file;
-                                            Helper.DecompressData(data, out out_file);
-                                            extract.Write(out_file, 0, out_file.Length);
-                                        }
-                                        chunk++;
-                                    }
-                                }
-                                // End
-                                using (Stream unknown_stream = File.Create(folder_path_blz + "\\id.txt")) { unknown_stream.Write(unknown, 0, 0x10); }
-                                Console.WriteLine("INFO: Detected and unpacked .blz4 file. {0} chunk(s).", chunk);
-                                */
                             }
                         }
 
@@ -224,7 +153,7 @@ namespace qpckEater
 
                     // End
                     Console.WriteLine("=========================");
-                    Console.WriteLine("INFO: Finished extracting {0} files.", count);
+                    Console.WriteLine("INFO: Finished processing {0} files.", count);
 
                     // REMLATER: Clean up dupes in list
                     var previous = new HashSet<string>();
