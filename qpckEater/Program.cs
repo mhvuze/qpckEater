@@ -23,18 +23,18 @@ namespace qpckEater
             Console.WriteLine("=========================");
 
             // Handle arguments
-            if (args.Length < 2) { Console.WriteLine("ERROR: Not enough arguments specified.\n\nExtract: qpckEater -x <qpck>\nExtract and unpack: qpckEater -xp <qpck>\n\nCreate qpck: qpckEater -c <folder>\nRepack .blz4/.pres: qpckEater -r <folder>"); return; }
+            if (args.Length < 2) { Console.WriteLine("ERROR: Not enough arguments specified.\n\nExtract: qpckEater -x <qpck>\nExtract and unpack: qpckEater -xp <qpck>"); return; }
             mode = args[0];
             input_str = args[1];
 
             // Check mode
-            if (mode != "-x" && mode != "-xp" && mode != "-c" && mode != "-r") { Console.WriteLine("ERROR: Unsupported mode specified."); return; }
+            if (mode != "-x" && mode != "-xp") { Console.WriteLine("ERROR: Unsupported mode specified."); return; }
 
             // Unpacking
             if (mode == "-x" || mode == "-xp")
             {
-                // Check file
-                if (!File.Exists(input_str)) { Console.WriteLine("ERROR: Specified qpck file doesn't exist."); return; }
+                // Check files
+                if (!File.Exists(input_str)) { Console.WriteLine("ERROR: Specified qpck file doesn't exist."); return; }                
 
                 // Variables
                 long start_offset = 0;
@@ -49,6 +49,9 @@ namespace qpckEater
                     string folder_path = new FileInfo(input_str).Directory.FullName + "\\" + Path.GetFileNameWithoutExtension(input_str);
                     if (!Directory.Exists(folder_path)) { Directory.CreateDirectory(folder_path); }
 
+                    if (File.Exists(folder_path + "\\pres_list.txt")) { File.Delete(folder_path + "\\pres_list.txt"); }
+                    if (File.Exists(folder_path + "\\pres_list_clean.txt")) { File.Delete(folder_path + "\\pres_list_clean.txt"); }
+
                     Console.WriteLine("File index:");
                     for (int i = 0; i < count; i++)
                     {
@@ -62,9 +65,7 @@ namespace qpckEater
 
                         // Extract file
                         reader.BaseStream.Seek(offset, SeekOrigin.Begin);
-                        int type_magic = reader.ReadInt32();
-                        reader.BaseStream.Seek(-4, SeekOrigin.Current);
-                        byte[] file_bytes = reader.ReadBytes(size);
+                        int type_magic = reader.ReadInt32();                                              
 
                         // Unpack extracted archives if intended
                         if (mode == "-xp")
@@ -72,10 +73,12 @@ namespace qpckEater
                             // .pres unpacking
                             if (type_magic == 0x73657250)
                             {
+                                reader.BaseStream.Seek(-4, SeekOrigin.Current);
+                                byte[] file_bytes = reader.ReadBytes(size);
+
                                 long reader_index_root = 0;
                                 long reader_index_file = 0;
 
-                                //using (BinaryReader pres_reader = new BinaryReader(File.Open(file, FileMode.Open)))
                                 Stream stream = new MemoryStream(file_bytes);
                                 using (BinaryReader pres_reader = new BinaryReader(stream))
                                 {
@@ -126,17 +129,11 @@ namespace qpckEater
                                             if (name_elements_file >= 3) { pres_reader.BaseStream.Seek(folder_off_final, SeekOrigin.Begin); str_folder_final = readNullterminated(pres_reader); }
                                             if (name_elements_file >= 4) { pres_reader.BaseStream.Seek(complete_off_final, SeekOrigin.Begin); str_complete_final = readNullterminated(pres_reader); }
 
-                                            // Print path to file
-                                            if (File.Exists(folder_path + "\\pres_list.txt")) { File.Delete(folder_path + "\\pres_list.txt"); }
+                                            // Print path to file                                            
                                             using (StreamWriter pres_list = new StreamWriter(folder_path + "\\pres_list.txt", true))
                                             {
-                                                if (str_complete_final == "")
-                                                {
-                                                    // skip
-                                                }
-                                                else { pres_list.WriteLine(str_complete_final); }                                                
-                                            }
-                                                
+                                                if (str_complete_final != "") { pres_list.WriteLine(str_complete_final); }
+                                            }                                                
 
                                             // End loop
                                             pres_reader.BaseStream.Seek(reader_index_file + (k * 0x20), SeekOrigin.Begin);
@@ -155,95 +152,11 @@ namespace qpckEater
                     Console.WriteLine("=========================");
                     Console.WriteLine("INFO: Finished processing {0} files.", count);
 
-                    // REMLATER: Clean up dupes in list
+                    // Clean up dupes in list
                     var previous = new HashSet<string>();
                     File.WriteAllLines(folder_path + "\\pres_list_clean.txt", File.ReadLines(folder_path + "\\pres_list.txt").Where(line => previous.Add(line)));
                 }
             }
-
-            // Create qpck
-            if (mode == "-c")
-            {
-                // Check folder
-                if (!Directory.Exists(input_str)) { Console.WriteLine("ERROR: Specified folder doesn't exist."); return; }
-
-                // Get all files from directory (non-recursive)
-                string[] repack_files = Directory.GetFiles(input_str, "*.*", SearchOption.TopDirectoryOnly).Select(file => Path.GetFileName(file)).ToArray();
-                int count = repack_files.Count();
-                if (count < 1) { Console.WriteLine("ERROR: No valid files found."); return; }
-
-                // Prepare output file
-                string file_path = new FileInfo(input_str).Directory.FullName + "\\" + Path.GetFileName(input_str) + "_new.qpck";
-                File.WriteAllBytes(file_path, new byte[8 + (count * 20)]);
-                BinaryWriter writer = new BinaryWriter(File.Open(file_path, FileMode.Open));
-                writer.Write(magic);
-                writer.Write(count);
-
-                // Variables
-                long start_offset = 0;
-                long offset = 8 + (count * 20);
-                int progress = 1;
-
-                foreach (string file in repack_files)
-                {
-                    // Write file info
-                    string import_path = input_str + "\\" + file;
-                    string hash_str = Path.GetFileNameWithoutExtension(file).Substring(9);
-                    long hash = long.Parse(hash_str, NumberStyles.HexNumber);
-                    int size = Convert.ToInt32(new FileInfo(import_path).Length);
-
-                    Console.WriteLine("Processing file {0} / {1}: {2} [{3} | {4} bytes]", progress, count, hash_str, offset.ToString("X16"), size);
-
-                    writer.Write(offset);
-                    writer.Write(hash);
-                    writer.Write(size);
-
-                    // Add file data
-                    start_offset = writer.BaseStream.Position;
-
-                    byte[] data = File.ReadAllBytes(import_path);
-                    writer.BaseStream.Seek(offset, SeekOrigin.Begin);
-                    writer.Write(data);
-                    writer.BaseStream.Seek(start_offset, SeekOrigin.Begin);
-
-                    // Calculate offset/progress
-                    offset += size;
-                    progress++;
-                };
-                writer.Close();
-
-                // End
-                Console.WriteLine("=========================");
-                Console.WriteLine("INFO: Finished packing {0} files.", count);
-            }
-
-            // Repack blz4/pres
-            if (mode == "-r")
-            {
-                // Check folder
-                if (!Directory.Exists(input_str)) { Console.WriteLine("ERROR: Specified folder doesn't exist."); return; }
-
-                Console.WriteLine("INFO: Repacking .blz4/.pres is currently not supported.");
-                return;
-            }
-        }
-
-        // Better extensions
-        static string GetExtension(int magic)
-        {
-            Dictionary<int, string> extension_dic = new Dictionary<int, string>
-            {
-                { 0x46534e42, ".bnsf" },
-                { 0x6c566d47, ".gmvl" },
-                { 0x3272742e, ".tr2" },
-                { 0x73657250, ".pres" },
-                { 0x347a6c62, ".blz4" },
-            };
-
-            string extension_str;
-            if (!extension_dic.TryGetValue(magic, out extension_str)) { extension_str = ".bin"; }
-
-            return extension_str;
         }
 
         // Read null-terminated string
